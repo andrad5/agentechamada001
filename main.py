@@ -6,9 +6,10 @@ from google.cloud import bigquery
 from google.oauth2 import service_account
 from streamlit_autorefresh import st_autorefresh
 
-import streamlit as st
+# --- 1. CONFIGURAÇÃO DA PÁGINA (DEVE SER A PRIMEIRA COISA) ---
+st.set_page_config(page_title="Kids ICM Itaqua", page_icon="⛪", layout="centered")
 
-# --- 1. FUNÇÃO DE LOGIN ---
+# --- 2. FUNÇÃO DE LOGIN ---
 def login():
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
@@ -18,32 +19,23 @@ def login():
         senha_digitada = st.text_input("Senha do Ministério Infantil", type="password")
         
         if st.button("Entrar"):
-            # Verifica a senha global que você moveu para o topo do Secrets
+            # Verifica a senha global configurada no topo do Secrets
             if senha_digitada == st.secrets["app_password"]:
                 st.session_state.autenticado = True
                 st.rerun()
             else:
                 st.error("Senha incorreta! 🚫")
         
-        # O PULO DO GATO: Se não estiver autenticado, para o código aqui!
+        # Bloqueia a execução do restante do código
         st.stop() 
 
-# --- 2. EXECUTA O LOGIN ---
+# Executa o login antes de qualquer outra lógica
 login()
 
-# --- 3. SÓ CHEGA AQUI SE PASSAR PELO LOGIN ---
-st.title("⛪ Ministério Infantil - Itaqua")
-# ... restante do seu código (tabs, BigQuery, etc) ...
-
-
-
-# --- 1. CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Kids ICM Itaqua", page_icon="⛪", layout="centered")
-
-# Aumentamos o intervalo para 60s para não sobrecarregar a API no Railway
+# --- 3. CONFIGURAÇÕES GERAIS E CONEXÕES ---
+# Atualiza a página a cada 60s para manter os dados do BigQuery frescos
 st_autorefresh(interval=60 * 1000, key="datarefresh")
 
-# --- 2. CONEXÃO COM BIGQUERY (VIA SECRETS.TOML) ---
 def criar_cliente_bq():
     """Conecta ao BigQuery usando os secrets configurados"""
     info = st.secrets["gcp_service_account"]
@@ -52,9 +44,8 @@ def criar_cliente_bq():
 
 client = criar_cliente_bq()
 
-# --- 3. FUNÇÃO DE SALVAMENTO (CARGA EM LOTE PARA FREE TIER) ---
 def salvar_no_bq(tabela_id, lista_dados):
-    """Envia dados usando Load Job para evitar erro 403"""
+    """Envia dados usando Load Job para evitar erro 403 (Free Tier)"""
     try:
         df_temp = pd.DataFrame(lista_dados)
         job_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
@@ -65,9 +56,8 @@ def salvar_no_bq(tabela_id, lista_dados):
         st.error(f"Erro ao salvar no BigQuery: {e}")
         return False
 
-# --- 4. WHATSAPP (EVOLUTION API NO RAILWAY) ---
 def enviar_whatsapp(telefone, mensagem):
-    """Envia mensagens via Railway com timeout estendido para evitar erros 502/499"""
+    """Envia mensagens via Evolution API no Railway"""
     url = "https://evolution-api-production-de42.up.railway.app/message/sendText/Igreja_Itaqua"
     headers = {
         "apikey": "422442",
@@ -76,23 +66,21 @@ def enviar_whatsapp(telefone, mensagem):
     payload = {
         "number": str(telefone), 
         "text": mensagem,
-        "linkPreview": False # Desativado para tornar a requisição mais leve
+        "linkPreview": False 
     }
     
     try:
-        # Timeout de 30s para dar tempo da API processar na nuvem
         response = requests.post(url, json=payload, headers=headers, timeout=30)
-        
         if response.status_code in [200, 201]:
             return True
         else:
-            st.warning(f"API instável (Status {response.status_code}). Verifique os logs no Railway.")
+            st.warning(f"API instável (Status {response.status_code}).")
             return False
     except Exception as e:
         st.error(f"Erro de conexão com o WhatsApp: {e}")
         return False
 
-# --- 5. INTERFACE DO USUÁRIO ---
+# --- 4. INTERFACE DO USUÁRIO (SÓ APARECE APÓS O LOGIN) ---
 st.title("⛪ Ministério Infantil - Itaqua")
 tab_checkin, tab_operacao, tab_cadastro = st.tabs(["📝 Check-in", "🚨 Operação", "🆕 Cadastro"])
 
