@@ -6,32 +6,30 @@ from google.cloud import bigquery
 from google.oauth2 import service_account
 from streamlit_autorefresh import st_autorefresh
 
-# --- SISTEMA DE LOGIN SIMPLES ---
-def check_password():
-    """Retorna True se o usuário inseriu a senha correta."""
-    if "password_correct" not in st.session_state:
-        st.session_state["password_correct"] = False
+import streamlit as st
 
-    if st.session_state["password_correct"]:
-        return True
+# 1. Verifica se a senha está nos Secrets
+def login():
+    if "autenticado" not in st.session_state:
+        st.session_state.autenticado = False
 
-    # Interface de Login
-    st.title("🔐 Acesso Restrito - ICM Itaquá")
-    password = st.text_input("Digite a senha de acesso", type="password")
-    
-    # Você pode definir a senha que quiser aqui (ou buscar nos secrets)
-    if st.button("Entrar"):
-        if password == st.secrets["app_password"]:
-            st.session_state["password_correct"] = True
-            st.rerun()
-        else:
-            st.error("Senha incorreta! 🚫")
-    return False
+    if not st.session_state.autenticado:
+        st.title("🔐 Acesso - ICM Itaquá")
+        senha = st.text_input("Senha do Ministério Infantil", type="password")
+        if st.button("Entrar"):
+            # Aqui ele lê a linha que você adicionou no Secrets
+            if senha == st.secrets["app_password"]:
+                st.session_state.autenticado = True
+                st.rerun()
+            else:
+                st.error("Senha incorreta")
+        return False
+    return True
 
-# Só executa o restante do código se o login for bem-sucedido
-if not check_password():
-    st.stop() 
-
+# 2. Só carrega o restante se o login for True
+if login():
+    # ... aqui entra o seu código das tabs, BigQuery e Railway ...
+    st.write("Bem-vindo ao sistema de chamada!")
 # --- A PARTIR DAQUI SEGUE O SEU CÓDIGO ORIGINAL (TABS, BIGQUERY, ETC) ---
 
 
