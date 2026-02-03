@@ -6,6 +6,36 @@ from google.cloud import bigquery
 from google.oauth2 import service_account
 from streamlit_autorefresh import st_autorefresh
 
+# --- SISTEMA DE LOGIN SIMPLES ---
+def check_password():
+    """Retorna True se o usuário inseriu a senha correta."""
+    if "password_correct" not in st.session_state:
+        st.session_state["password_correct"] = False
+
+    if st.session_state["password_correct"]:
+        return True
+
+    # Interface de Login
+    st.title("🔐 Acesso Restrito - ICM Itaquá")
+    password = st.text_input("Digite a senha de acesso", type="password")
+    
+    # Você pode definir a senha que quiser aqui (ou buscar nos secrets)
+    if st.button("Entrar"):
+        if password == st.secrets["app_password"]:
+            st.session_state["password_correct"] = True
+            st.rerun()
+        else:
+            st.error("Senha incorreta! 🚫")
+    return False
+
+# Só executa o restante do código se o login for bem-sucedido
+if not check_password():
+    st.stop() 
+
+# --- A PARTIR DAQUI SEGUE O SEU CÓDIGO ORIGINAL (TABS, BIGQUERY, ETC) ---
+
+
+
 # --- 1. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Kids ICM Itaqua", page_icon="⛪", layout="centered")
 
