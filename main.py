@@ -6,38 +6,39 @@ from google.cloud import bigquery
 from google.oauth2 import service_account
 from streamlit_autorefresh import st_autorefresh
 
-# --- 1. CONFIGURAÇÃO DA PÁGINA (DEVE SER A PRIMEIRA COISA) ---
+# --- 1. CONFIGURAÇÃO DA PÁGINA (DEVE SER A PRIMEIRA LINHA EXECUTÁVEL) ---
 st.set_page_config(page_title="Kids ICM Itaqua", page_icon="⛪", layout="centered")
 
-# --- 2. FUNÇÃO DE LOGIN ---
+# --- 2. FUNÇÃO DE LOGIN (SEGURANÇA DO APP) ---
 def login():
+    """Cria uma barreira de acesso antes de carregar o restante do app"""
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
 
     if not st.session_state.autenticado:
         st.title("🔐 Acesso - ICM Itaquá")
+        # Campo de senha lê a chave 'app_password' dos Secrets do Streamlit
         senha_digitada = st.text_input("Senha do Ministério Infantil", type="password")
         
-        if st.button("Entrar"):
-            # Verifica a senha global configurada no topo do Secrets
+        if st.button("Entrar", use_container_width=True):
             if senha_digitada == st.secrets["app_password"]:
                 st.session_state.autenticado = True
                 st.rerun()
             else:
                 st.error("Senha incorreta! 🚫")
         
-        # Bloqueia a execução do restante do código
+        # Interrompe o script para não mostrar os dados abaixo
         st.stop() 
 
-# Executa o login antes de qualquer outra lógica
+# Executa o login
 login()
 
-# --- 3. CONFIGURAÇÕES GERAIS E CONEXÕES ---
-# Atualiza a página a cada 60s para manter os dados do BigQuery frescos
+# --- 3. CONFIGURAÇÕES GERAIS E CONEXÕES (SÓ RODA SE LOGADO) ---
+# Autorefresh de 60s para manter a lista de sala atualizada
 st_autorefresh(interval=60 * 1000, key="datarefresh")
 
 def criar_cliente_bq():
-    """Conecta ao BigQuery usando os secrets configurados"""
+    """Conecta ao BigQuery usando os secrets configurados no painel do Streamlit"""
     info = st.secrets["gcp_service_account"]
     credentials = service_account.Credentials.from_service_account_info(info)
     return bigquery.Client(credentials=credentials, project=info["project_id"])
@@ -45,19 +46,19 @@ def criar_cliente_bq():
 client = criar_cliente_bq()
 
 def salvar_no_bq(tabela_id, lista_dados):
-    """Envia dados usando Load Job para evitar erro 403 (Free Tier)"""
+    """Salva dados no BigQuery usando Load Job para evitar limites do Free Tier"""
     try:
         df_temp = pd.DataFrame(lista_dados)
         job_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
         job = client.load_table_from_dataframe(df_temp, tabela_id, job_config=job_config)
-        job.result() # Aguarda confirmação
+        job.result() 
         return True
     except Exception as e:
         st.error(f"Erro ao salvar no BigQuery: {e}")
         return False
 
 def enviar_whatsapp(telefone, mensagem):
-    """Envia mensagens via Evolution API no Railway"""
+    """Envia mensagens via Evolution API no Railway com timeout estendido"""
     url = "https://evolution-api-production-de42.up.railway.app/message/sendText/Igreja_Itaqua"
     headers = {
         "apikey": "422442",
@@ -70,7 +71,8 @@ def enviar_whatsapp(telefone, mensagem):
     }
     
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        # Timeout aumentado para 40s para lidar com a instabilidade da API
+        response = requests.post(url, json=payload, headers=headers, timeout=40)
         if response.status_code in [200, 201]:
             return True
         else:
@@ -80,7 +82,7 @@ def enviar_whatsapp(telefone, mensagem):
         st.error(f"Erro de conexão com o WhatsApp: {e}")
         return False
 
-# --- 4. INTERFACE DO USUÁRIO (SÓ APARECE APÓS O LOGIN) ---
+# --- 4. INTERFACE DO USUÁRIO ---
 st.title("⛪ Ministério Infantil - Itaqua")
 tab_checkin, tab_operacao, tab_cadastro = st.tabs(["📝 Check-in", "🚨 Operação", "🆕 Cadastro"])
 
@@ -115,6 +117,7 @@ with tab_checkin:
 # --- ABA 2: OPERAÇÃO ---
 with tab_operacao:
     st.header("Crianças em Sala")
+    # Filtra apenas o check-in do dia atual (Fuso SP)
     query_sala = """
         SELECT * FROM `agentes-icm-itaqua.principais_tabelas.checkin`
         WHERE DATA_ENTRADA != '' 
