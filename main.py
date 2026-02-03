@@ -8,29 +8,32 @@ from streamlit_autorefresh import st_autorefresh
 
 import streamlit as st
 
-# 1. Verifica se a senha está nos Secrets
+# --- 1. FUNÇÃO DE LOGIN ---
 def login():
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
 
     if not st.session_state.autenticado:
         st.title("🔐 Acesso - ICM Itaquá")
-        senha = st.text_input("Senha do Ministério Infantil", type="password")
+        senha_digitada = st.text_input("Senha do Ministério Infantil", type="password")
+        
         if st.button("Entrar"):
-            # Aqui ele lê a linha que você adicionou no Secrets
-            if senha == st.secrets["app_password"]:
+            # Verifica a senha global que você moveu para o topo do Secrets
+            if senha_digitada == st.secrets["app_password"]:
                 st.session_state.autenticado = True
                 st.rerun()
             else:
-                st.error("Senha incorreta")
-        return False
-    return True
+                st.error("Senha incorreta! 🚫")
+        
+        # O PULO DO GATO: Se não estiver autenticado, para o código aqui!
+        st.stop() 
 
-# 2. Só carrega o restante se o login for True
-if login():
-    # ... aqui entra o seu código das tabs, BigQuery e Railway ...
-    st.write("Bem-vindo ao sistema de chamada!")
-# --- A PARTIR DAQUI SEGUE O SEU CÓDIGO ORIGINAL (TABS, BIGQUERY, ETC) ---
+# --- 2. EXECUTA O LOGIN ---
+login()
+
+# --- 3. SÓ CHEGA AQUI SE PASSAR PELO LOGIN ---
+st.title("⛪ Ministério Infantil - Itaqua")
+# ... restante do seu código (tabs, BigQuery, etc) ...
 
 
 
