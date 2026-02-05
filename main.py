@@ -129,13 +129,34 @@ with tab_operacao:
             st.info("Nenhuma criança em sala no momento.")
         else:
             for idx, crianca in df_sala.iterrows():
-                with st.container(border=True):
-                    col1, col2 = st.columns([3, 1])
-                    col1.write(f"👶 **{crianca['NOME_CRIANCA']}**")
-                    if col2.button(f"🚽 Banheiro", key=f"op_{idx}"):
-                        msg_banheiro = f"Paz! O(a) *{crianca['NOME_CRIANCA']}* precisa ir ao banheiro. Pode vir nos auxiliar? 🚽"
-                        if enviar_whatsapp(crianca['TELEFONE_RESPONSAVEL'], msg_banheiro):
-                            st.toast("Mensagem enviada!")
+                
+               c1, c2, c3 = st.columns(3)
+                
+                with c1:
+                    if st.button("🚽 Banheiro", key=f"ban_{idx}"):
+                        txt = f"Paz do Senhor {crianca['nome_responsavel']}, o(a) {crianca['nome_crianca']} precisa ir ao banheiro. Pode nos auxiliar?"
+                        enviar_whatsapp_api(crianca['telefone_responsavel'], txt)
+                        st.toast(f"Aviso enviado para {crianca['nome_responsavel']}!")
+
+                with c2:
+                    if st.button("😢 Choro", key=f"cho_{idx}"):
+                        txt = f"Paz do Senhor {crianca['nome_responsavel']}, o(a) {crianca['nome_crianca']} está sentindo sua falta. Poderia vir dar um abraço nele(a)?"
+                        enviar_whatsapp_api(crianca['telefone_responsavel'], txt)
+                        st.toast(f"Aviso enviado!")
+
+                with c3:
+                    if st.button("🚨 Chamar", key=f"urg_{idx}"):
+                        txt = f"Paz do Senhor {crianca['nome_responsavel']}, solicitamos sua presença na salinha das crianças para auxiliar o(a) {crianca['nome_crianca']}."
+                        enviar_whatsapp_api(crianca['telefone_responsavel'], txt)
+                        st.toast(f"Chamado urgente enviado!")
+                
+               # with st.container(border=True):
+               #     col1, col2 = st.columns([3, 1])
+               #     col1.write(f"👶 **{crianca['NOME_CRIANCA']}**")
+               #     if col2.button(f"🚽 Banheiro", key=f"op_{idx}"):
+               #         msg_banheiro = f"Paz! O(a) *{crianca['NOME_CRIANCA']}* precisa ir ao banheiro. Pode vir nos auxiliar? 🚽"
+               #         if enviar_whatsapp(crianca['TELEFONE_RESPONSAVEL'], msg_banheiro):
+               #             st.toast("Mensagem enviada!")
     except Exception as e:
         st.error(f"Erro ao carregar lista de sala: {e}")
 
