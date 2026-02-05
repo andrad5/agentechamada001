@@ -6,18 +6,16 @@ from google.cloud import bigquery
 from google.oauth2 import service_account
 from streamlit_autorefresh import st_autorefresh
 
-# --- 1. CONFIGURAÇÃO DA PÁGINA (DEVE SER A PRIMEIRA LINHA EXECUTÁVEL) ---
+# --- 1. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Kids ICM Itaqua", page_icon="⛪", layout="centered")
 
-# --- 2. FUNÇÃO DE LOGIN (SEGURANÇA DO APP) ---
+# --- 2. FUNÇÃO DE LOGIN ---
 def login():
-    """Cria uma barreira de acesso antes de carregar o restante do app"""
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
 
     if not st.session_state.autenticado:
         st.title("🔐 Acesso - ICM Itaquá")
-        # Campo de senha lê a chave 'app_password' dos Secrets do Streamlit
         senha_digitada = st.text_input("Senha do Ministério Infantil", type="password")
         
         if st.button("Entrar", use_container_width=True):
@@ -26,19 +24,15 @@ def login():
                 st.rerun()
             else:
                 st.error("Senha incorreta! 🚫")
-        
-        # Interrompe o script para não mostrar os dados abaixo
         st.stop() 
 
-# Executa o login
 login()
 
-# --- 3. CONFIGURAÇÕES GERAIS E CONEXÕES (SÓ RODA SE LOGADO) ---
-# Autorefresh de 60s para manter a lista de sala atualizada
+# --- 3. CONFIGURAÇÕES GERAIS E CONEXÕES ---
 st_autorefresh(interval=60 * 1000, key="datarefresh")
 
+@st.cache_resource
 def criar_cliente_bq():
-    """Conecta ao BigQuery usando os secrets configurados no painel do Streamlit"""
     info = st.secrets["gcp_service_account"]
     credentials = service_account.Credentials.from_service_account_info(info)
     return bigquery.Client(credentials=credentials, project=info["project_id"])
@@ -46,7 +40,6 @@ def criar_cliente_bq():
 client = criar_cliente_bq()
 
 def salvar_no_bq(tabela_id, lista_dados):
-    """Salva dados no BigQuery usando Load Job para evitar limites do Free Tier"""
     try:
         df_temp = pd.DataFrame(lista_dados)
         job_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
@@ -58,26 +51,22 @@ def salvar_no_bq(tabela_id, lista_dados):
         return False
 
 def enviar_whatsapp(telefone, mensagem):
-    """Envia mensagens via Evolution API no Railway com timeout estendido"""
+    # Garante que o telefone tenha apenas números
+    numero_limpo = ''.join(filter(str.isdigit, str(telefone)))
     url = "https://evolution-api-production-de42.up.railway.app/message/sendText/Igreja_Itaqua"
     headers = {
         "apikey": "422442",
         "Content-Type": "application/json"
     }
     payload = {
-        "number": str(telefone), 
+        "number": numero_limpo, 
         "text": mensagem,
         "linkPreview": False 
     }
     
     try:
-        # Timeout aumentado para 40s para lidar com a instabilidade da API
         response = requests.post(url, json=payload, headers=headers, timeout=40)
-        if response.status_code in [200, 201]:
-            return True
-        else:
-            st.warning(f"API instável (Status {response.status_code}).")
-            return False
+        return response.status_code in [200, 201]
     except Exception as e:
         st.error(f"Erro de conexão com o WhatsApp: {e}")
         return False
@@ -117,7 +106,6 @@ with tab_checkin:
 # --- ABA 2: OPERAÇÃO ---
 with tab_operacao:
     st.header("Crianças em Sala")
-    # Filtra apenas o check-in do dia atual (Fuso SP)
     query_sala = """
         SELECT * FROM `agentes-icm-itaqua.principais_tabelas.checkin`
         WHERE DATA_ENTRADA != '' 
@@ -129,34 +117,32 @@ with tab_operacao:
             st.info("Nenhuma criança em sala no momento.")
         else:
             for idx, crianca in df_sala.iterrows():
-                
-               c1, c2, c3 = st.columns(3)
-                
-                with c1:
-                    if st.button("🚽 Banheiro", key=f"ban_{idx}"):
-                        txt = f"Paz do Senhor {crianca['nome_responsavel']}, o(a) {crianca['nome_crianca']} precisa ir ao banheiro. Pode nos auxiliar?"
-                        enviar_whatsapp_api(crianca['telefone_responsavel'], txt)
-                        st.toast(f"Aviso enviado para {crianca['nome_responsavel']}!")
+                # Container para agrupar o nome e os botões da mesma criança
+                with st.container(border=True):
+                    st.subheader(f"👶 {crianca['NOME_CRIANCA']}")
+                    st.caption(f"Responsável: {crianca['NOME_RESPONSAVEL']}")
+                    
+                    c1, c2, c3 = st.columns(3)
+                    
+                    # Correção: nome da função (enviar_whatsapp) e nome das colunas (MAIÚSCULO)
+                    with c1:
+                        if st.button("🚽 Banheiro", key=f"ban_{idx}"):
+                            txt = f"Paz do Senhor {crianca['NOME_RESPONSAVEL']}, o(a) {crianca['NOME_CRIANCA']} precisa ir ao banheiro. Pode nos auxiliar?"
+                            if enviar_whatsapp(crianca['TELEFONE_RESPONSAVEL'], txt):
+                                st.toast(f"Aviso enviado para {crianca['NOME_RESPONSAVEL']}!")
 
-                with c2:
-                    if st.button("😢 Choro", key=f"cho_{idx}"):
-                        txt = f"Paz do Senhor {crianca['nome_responsavel']}, o(a) {crianca['nome_crianca']} está sentindo sua falta. Poderia vir dar um abraço nele(a)?"
-                        enviar_whatsapp_api(crianca['telefone_responsavel'], txt)
-                        st.toast(f"Aviso enviado!")
+                    with c2:
+                        if st.button("😢 Choro", key=f"cho_{idx}"):
+                            txt = f"Paz do Senhor {crianca['NOME_RESPONSAVEL']}, o(a) {crianca['NOME_CRIANCA']} está sentindo sua falta. Poderia vir dar um abraço nele(a)?"
+                            if enviar_whatsapp(crianca['TELEFONE_RESPONSAVEL'], txt):
+                                st.toast(f"Aviso enviado!")
 
-                with c3:
-                    if st.button("🚨 Chamar", key=f"urg_{idx}"):
-                        txt = f"Paz do Senhor {crianca['nome_responsavel']}, solicitamos sua presença na salinha das crianças para auxiliar o(a) {crianca['nome_crianca']}."
-                        enviar_whatsapp_api(crianca['telefone_responsavel'], txt)
-                        st.toast(f"Chamado urgente enviado!")
-                
-               # with st.container(border=True):
-               #     col1, col2 = st.columns([3, 1])
-               #     col1.write(f"👶 **{crianca['NOME_CRIANCA']}**")
-               #     if col2.button(f"🚽 Banheiro", key=f"op_{idx}"):
-               #         msg_banheiro = f"Paz! O(a) *{crianca['NOME_CRIANCA']}* precisa ir ao banheiro. Pode vir nos auxiliar? 🚽"
-               #         if enviar_whatsapp(crianca['TELEFONE_RESPONSAVEL'], msg_banheiro):
-               #             st.toast("Mensagem enviada!")
+                    with c3:
+                        if st.button("🚨 Chamar", key=f"urg_{idx}"):
+                            txt = f"Paz do Senhor {crianca['NOME_RESPONSAVEL']}, solicitamos sua presença na salinha das crianças para auxiliar o(a) {crianca['NOME_CRIANCA']}."
+                            if enviar_whatsapp(crianca['TELEFONE_RESPONSAVEL'], txt):
+                                st.toast(f"Chamado urgente enviado!")
+                                
     except Exception as e:
         st.error(f"Erro ao carregar lista de sala: {e}")
 
@@ -179,6 +165,6 @@ with tab_cadastro:
                 }]
                 if salvar_no_bq("agentes-icm-itaqua.principais_tabelas.historico_infantil", novo_reg):
                     st.success("Cadastrado com sucesso!")
-                    st.cache_data.clear()
+                    # Limpa o cache se houver
             else:
                 st.warning("Preencha Nome e WhatsApp.")
