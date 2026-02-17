@@ -51,24 +51,31 @@ def salvar_no_bq(tabela_id, lista_dados):
         return False
 
 def enviar_whatsapp(telefone, mensagem):
-    # Garante que o telefone tenha apenas números
+    # 1. Limpeza do número
     numero_limpo = ''.join(filter(str.isdigit, str(telefone)))
-    url = "https://evolution-api-production-de42.up.railway.app/message/sendText/Igreja_Itaqua"
-    headers = {
-        "apikey": "422442",
-        "Content-Type": "application/json"
-    }
+    
+    # 2. Garante o DDI 55 (Brasil) se não tiver
+    if len(numero_limpo) <= 11: 
+        numero_limpo = "55" + numero_limpo
+
+    # 3. URL do seu n8n (Webhook)
+    url_n8n = "https://n8n-production-41a1.up.railway.app/webhook/enviar-mensagem"
+    
+    # 4. Payload (Os dados que o n8n vai receber)
     payload = {
-        "number": numero_limpo, 
-        "text": mensagem,
-        "linkPreview": False 
+        "telefone": numero_limpo, 
+        "mensagem": mensagem
     }
     
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=40)
-        return response.status_code in [200, 201]
+        # Envia para o n8n
+        response = requests.post(url_n8n, json=payload, timeout=10)
+        
+        # O n8n geralmente retorna 200 se recebeu com sucesso
+        return response.status_code == 200
+            
     except Exception as e:
-        st.error(f"Erro de conexão com o WhatsApp: {e}")
+        st.error(f"Erro de conexão com o n8n: {e}")
         return False
 
 # --- 4. INTERFACE DO USUÁRIO ---
