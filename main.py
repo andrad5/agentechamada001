@@ -52,32 +52,29 @@ def salvar_no_bq(tabela_id, lista_dados):
         return False
 
 # --- FUNÇÃO ATUALIZADA PARA O N8N NO RAILWAY ---
+# --- SUBTITUA SUA FUNÇÃO enviar_whatsapp POR ESTA ---
 def enviar_whatsapp(telefone, mensagem):
     # 1. Limpeza do número
     numero_limpo = ''.join(filter(str.isdigit, str(telefone)))
     
-    # 2. Garante o DDI 55 (Brasil) se não tiver
+    # 2. Garante o DDI 55
     if len(numero_limpo) <= 11: 
         numero_limpo = "55" + numero_limpo
 
-    # 3. URL do seu n8n (Webhook)
+    # 3. URL do n8n (Webhook)
     url_n8n = "https://n8n-production-41a1.up.railway.app/webhook/enviar-mensagem"
     
-    # 4. Payload (Os dados que o n8n vai receber)
+    # 4. PAYLOAD CORRETO (Que o n8n espera)
     payload = {
         "telefone": numero_limpo, 
         "mensagem": mensagem
     }
     
     try:
-        # Envia para o n8n
         response = requests.post(url_n8n, json=payload, timeout=10)
-        
-        # O n8n retorna 200 se recebeu com sucesso
         return response.status_code == 200
-            
     except Exception as e:
-        st.error(f"Erro de conexão com o n8n: {e}")
+        st.error(f"Erro: {e}")
         return False
 
 # --- 4. INTERFACE DO USUÁRIO ---
