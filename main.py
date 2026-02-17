@@ -19,6 +19,7 @@ def login():
         senha_digitada = st.text_input("Senha do Ministério Infantil", type="password")
         
         if st.button("Entrar", use_container_width=True):
+            # Certifique-se de que 'app_password' está no seu secrets.toml
             if senha_digitada == st.secrets["app_password"]:
                 st.session_state.autenticado = True
                 st.rerun()
@@ -50,6 +51,7 @@ def salvar_no_bq(tabela_id, lista_dados):
         st.error(f"Erro ao salvar no BigQuery: {e}")
         return False
 
+# --- FUNÇÃO ATUALIZADA PARA O N8N NO RAILWAY ---
 def enviar_whatsapp(telefone, mensagem):
     # 1. Limpeza do número
     numero_limpo = ''.join(filter(str.isdigit, str(telefone)))
@@ -71,7 +73,7 @@ def enviar_whatsapp(telefone, mensagem):
         # Envia para o n8n
         response = requests.post(url_n8n, json=payload, timeout=10)
         
-        # O n8n geralmente retorna 200 se recebeu com sucesso
+        # O n8n retorna 200 se recebeu com sucesso
         return response.status_code == 200
             
     except Exception as e:
@@ -131,7 +133,6 @@ with tab_operacao:
                     
                     c1, c2, c3 = st.columns(3)
                     
-                    # Correção: nome da função (enviar_whatsapp) e nome das colunas (MAIÚSCULO)
                     with c1:
                         if st.button("🚽 Banheiro", key=f"ban_{idx}"):
                             txt = f"Paz do Senhor {crianca['NOME_RESPONSAVEL']}, o(a) {crianca['NOME_CRIANCA']} precisa ir ao banheiro. Pode nos auxiliar?"
@@ -172,6 +173,5 @@ with tab_cadastro:
                 }]
                 if salvar_no_bq("agentes-icm-itaqua.principais_tabelas.historico_infantil", novo_reg):
                     st.success("Cadastrado com sucesso!")
-                    # Limpa o cache se houver
             else:
                 st.warning("Preencha Nome e WhatsApp.")
